@@ -12,7 +12,9 @@ This tool processes Business Central AL files and generates documentation using 
 1. Clone this repository
 2. Set your Anthropic API key as an environment variable:
    ```cmd
-   set ANTHROPIC_API_KEY=your-api-key
+   set ANTHROPIC_API_KEY=your-api-key (Windows Command Prompt)
+   export ANTHROPIC_API_KEY=your-api-key (Linux)
+   $env:ANTHROPIC_API_KEY="your-api-key" (PowerShell)
    ```
 
 ## Usage
