@@ -60,7 +60,10 @@ async function processALFiles(inputDir: string, outputDir: string, apiKey: strin
       const outputFilename = entry.name.replace('.al', '.md');
       const outputPath = join(outputDir, outputFilename);
       
-      await Deno.writeTextFile(outputPath, result.content[0].text);
+      // Extract only the content after </code_analysis>
+      const text = result.content[0].text;
+      const markdownContent = text.split('</code_analysis>')[1]?.trim() ?? text;
+      await Deno.writeTextFile(outputPath, markdownContent);
       
       console.log(`Processed ${entry.name} -> ${outputFilename}`);
     }
