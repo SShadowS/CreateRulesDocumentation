@@ -67,13 +67,34 @@ async function processALFiles(inputDir: string, outputDir: string, apiKey: strin
   }
 }
 
+// Get command line arguments
+const args = Deno.args;
+if (args.length !== 2) {
+  console.error("Usage: deno run --allow-read --allow-write --allow-net --allow-env process_al_files.ts <input_dir> <output_dir>");
+  Deno.exit(1);
+}
+
+const [inputDir, outputDir] = args;
 const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+
 if (!apiKey) {
   console.error("Please set ANTHROPIC_API_KEY environment variable");
   Deno.exit(1);
 }
 
-const inputDir = "./al-files";  // Directory containing .al files
-const outputDir = "./docs";     // Directory for output markdown files
+// Verify input directory exists
+try {
+  const inputDirInfo = await Deno.stat(inputDir);
+  if (!inputDirInfo.isDirectory) {
+    console.error(`Error: ${inputDir} is not a directory`);
+    Deno.exit(1);
+  }
+} catch (error) {
+  if (error instanceof Deno.errors.NotFound) {
+    console.error(`Error: Input directory ${inputDir} does not exist`);
+    Deno.exit(1);
+  }
+  throw error;
+}
 
 processALFiles(inputDir, outputDir, apiKey).catch(console.error);

@@ -17,17 +17,16 @@ This tool processes Business Central AL files and generates documentation using 
 
 ## Usage
 
-1. Create a directory called `al-files` and place your AL source files in it:
+1. Run the script with input and output directory parameters:
    ```cmd
-   mkdir al-files
+   deno run --allow-read --allow-write --allow-net --allow-env process_al_files.ts <input_dir> <output_dir>
+   ```
+   For example:
+   ```cmd
+   deno run --allow-read --allow-write --allow-net --allow-env process_al_files.ts ./al-files ./docs
    ```
 
-2. Run the script:
-   ```cmd
-   deno run --allow-read --allow-write --allow-net --allow-env process_al_files.ts
-   ```
-
-3. The generated documentation will be created in the `docs` directory, with each AL file having a corresponding markdown file.
+2. The generated documentation will be created in the specified output directory, with each AL file having a corresponding markdown file.
 
 ## Output
 
