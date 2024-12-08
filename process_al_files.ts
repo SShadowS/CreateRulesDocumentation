@@ -1,7 +1,8 @@
 import { walk } from "https://deno.land/std/fs/mod.ts";
 import { join } from "https://deno.land/std/path/mod.ts";
 
-const ANALYSIS_PROMPT = `<examples>
+function createAnalysisPrompt(content: string) {
+  return `<examples>
 <example>
 <code>
 namespace STM.BusinessCentral.Sentinel;
@@ -207,6 +208,7 @@ Your final output must adhere to this structure:
 Remember to fill in the placeholders with the appropriate information derived from your code analysis. Ensure that your summary is concise, accurate, and follows this structure exactly.
 
 Begin your response with your analysis, then provide the formatted summary.`;
+}
 
 async function processSingleFile(filePath: string, outputDir: string, apiKey: string) {
   try {
@@ -236,7 +238,7 @@ async function processSingleFile(filePath: string, outputDir: string, apiKey: st
           content: [
             {
               type: "text",
-              text: ANALYSIS_PROMPT
+              text: createAnalysisPrompt(content)
             }
           ]
         }
@@ -294,7 +296,7 @@ async function processALFiles(inputDir: string, outputDir: string, apiKey: strin
               content: [
                 {
                   type: "text",
-                  text: ANALYSIS_PROMPT
+                  text: createAnalysisPrompt(content)
                 }
               ]
             },
