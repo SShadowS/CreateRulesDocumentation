@@ -1,6 +1,213 @@
 import { walk } from "https://deno.land/std/fs/mod.ts";
 import { join } from "https://deno.land/std/path/mod.ts";
 
+const ANALYSIS_PROMPT = `<examples>
+<example>
+<code>
+namespace STM.BusinessCentral.Sentinel;
+
+using Microsoft.Foundation.NoSeries;
+using Microsoft.Purchases.Setup;
+using Microsoft.Sales.Setup;
+using STM.BusinessCentral.Sentinel;
+
+codeunit 71180281 NonPostNoSeriesGapsSESTM implements IAuditAlertSESTM
+{
+    Access = Internal;
+    Permissions =
+        tabledata AlertSESTM = RI,
+        tabledata "No. Series" = R,
+        tabledata "No. Series Line" = R,
+        tabledata "Purchases & Payables Setup" = R,
+        tabledata "Sales & Receivables Setup" = R;
+
+    procedure CreateAlerts()
+    begin
+        CheckSalesSetup();
+        CheckPurchaseSetup();
+    end;
+
+    local procedure CheckPurchaseSetup()
+    var
+        PurchaseSetup: Record "Purchases & Payables Setup";
+    begin
+        PurchaseSetup.ReadIsolation(IsolationLevel::ReadUncommitted);
+        PurchaseSetup.SetLoadFields("Order Nos.", "Invoice Nos.", "Credit Memo Nos.", "Quote Nos.", "Vendor Nos.", "Blanket Order Nos.", "Price List Nos.", "Return Order Nos.");
+        if not PurchaseSetup.Get() then
+            exit;
+
+        CheckNoSeries(PurchaseSetup."Order Nos.");
+        CheckNoSeries(PurchaseSetup."Invoice Nos.");
+        CheckNoSeries(PurchaseSetup."Credit Memo Nos.");
+        CheckNoSeries(PurchaseSetup."Quote Nos.");
+        CheckNoSeries(PurchaseSetup."Vendor Nos.");
+        CheckNoSeries(PurchaseSetup."Blanket Order Nos.");
+        CheckNoSeries(PurchaseSetup."Price List Nos.");
+        CheckNoSeries(PurchaseSetup."Return Order Nos.");
+    end;
+
+    local procedure CheckSalesSetup()
+    var
+        SalesSetup: Record "Sales & Receivables Setup";
+    begin
+        SalesSetup.ReadIsolation(IsolationLevel::ReadUncommitted);
+        SalesSetup.SetLoadFields("Order Nos.", "Invoice Nos.", "Credit Memo Nos.", "Quote Nos.", "Customer Nos.", "Blanket Order Nos.", "Reminder Nos.", "Fin. Chrg. Memo Nos.", "Direct Debit Mandate Nos.", "Price List Nos.");
+        if not SalesSetup.Get() then
+            exit;
+
+        CheckNoSeries(SalesSetup."Order Nos.");
+        CheckNoSeries(SalesSetup."Invoice Nos.");
+        CheckNoSeries(SalesSetup."Credit Memo Nos.");
+        CheckNoSeries(SalesSetup."Quote Nos.");
+        CheckNoSeries(SalesSetup."Customer Nos.");
+        CheckNoSeries(SalesSetup."Blanket Order Nos.");
+        CheckNoSeries(SalesSetup."Reminder Nos.");
+        CheckNoSeries(SalesSetup."Fin. Chrg. Memo Nos.");
+        CheckNoSeries(SalesSetup."Direct Debit Mandate Nos.");
+        CheckNoSeries(SalesSetup."Price List Nos.");
+    end;
+
+    local procedure CheckNoSeries(NoSeriesCode: Code[20])
+    var
+        Alert: Record AlertSESTM;
+        NoSeriesLine: Record "No. Series Line";
+        NoSeriesSingle: Interface "No. Series - Single";
+        ActionRecommendationLbl: Label 'Change No Series %1 to allow gaps', Comment = '%1 = No. Series Code';
+        LongDescLbl: Label 'The No. Series %1 does not allow gaps and is responsible for non-posting documents/records. Consider configuring the No. Series to allow gaps to increase performance and decrease locking.', Comment = '%1 = No. Series Code';
+        ShortDescLbl: Label 'No Series %1 does not allow gaps', Comment = '%1 = No. Series Code';
+    begin
+        NoSeriesLine.SetRange("Series Code", NoSeriesCode);
+        if NoSeriesLine.FindSet() then
+            repeat
+                NoSeriesSingle := NoSeriesLine.Implementation;
+                if not NoSeriesSingle.MayProduceGaps() then
+                    Alert.New(
+                        AlertCodeSESTM::"SE-000006",
+                        StrSubstNo(ShortDescLbl, NoSeriesCode),
+                        SeveritySESTM::Warning,
+                        AreaSESTM::Performance,
+                        StrSubstNo(LongDescLbl, NoSeriesCode),
+                        StrSubstNo(ActionRecommendationLbl, NoSeriesCode),
+                        NoSeriesCode
+                    );
+            until NoSeriesLine.Next() = 0;
+    end;
+
+    procedure ShowMoreDetails(var Alert: Record AlertSESTM)
+    var
+        WikiLinkTok: Label 'https://github.com/StefanMaron/BusinessCentral.Sentinel/wiki/SE-000006', Locked = true;
+    begin
+        Hyperlink(WikiLinkTok);
+    end;
+
+    procedure ShowRelatedInformation(var Alert: Record AlertSESTM)
+    var
+        NoSeries: Record "No. Series";
+        OpenRecordQst: Label 'Do you want to open the No. Series %1?', Comment = '%1 = No. Series Code';
+    begin
+        if not Confirm(StrSubstNo(OpenRecordQst, Alert.UniqueIdentifier)) then
+            exit;
+
+        NoSeries.SetRange("Code", Alert.UniqueIdentifier);
+        Page.Run(Page::"No. Series", NoSeries);
+    end;
+
+    procedure AutoFix(var Alert: Record AlertSESTM)
+    begin
+
+    end;
+}
+</code>
+<ideal_output>
+<code_analysis>
+a. Rule ID: SE-000006
+b. Purpose: This rule checks for number series configurations in Business Central that don't allow gaps in both Sales and Purchase setups.
+c. What the rule checks:
+   - Purchase-related number series for: Orders, Invoices, Credit Memos, Quotes, Vendor Numbers, Blanket Orders, Price Lists, Return Orders
+   - Sales-related number series for: Orders, Invoices, Credit Memos, Quotes, Customer Numbers, Blanket Orders, Reminders, Finance Charge Memos, Direct Debit Mandates, Price Lists
+d. Why the rule matters: Number series that don't allow gaps can cause performance issues and locking problems in Business Central.
+e. Recommendation: Change the identified number series to allow gaps to improve performance and reduce locking issues.
+f. Severity: Warning
+   Area: Performance
+</code_analysis>
+
+**Rule ID: SE-000006**  
+**Purpose**: This rule checks for number series configurations in Business Central that don't allow gaps in both Sales and Purchase setups.
+ 
+**What it checks**:
+1. **Purchase-related number series** for:
+   - Orders
+   - Invoices
+   - Credit Memos
+   - Quotes
+   - Vendor Numbers
+   - Blanket Orders
+   - Price Lists
+   - Return Orders
+ 
+2. **Sales-related number series** for:
+   - Orders
+   - Invoices
+   - Credit Memos
+   - Quotes
+   - Customer Numbers
+   - Blanket Orders
+   - Reminders
+   - Finance Charge Memos
+   - Direct Debit Mandates
+   - Price Lists
+ 
+**Why it matters**: Number series that don't allow gaps can cause performance issues and locking problems in Business Central. The rule generates a warning alert when it finds such configurations.
+ 
+**Recommendation**: When identified, it suggests changing the number series to allow gaps to improve performance and reduce locking issues.
+ 
+**Severity**: Warning
+**Area**: Performance
+</ideal_output>
+</example>
+</examples>
+
+You are an expert in analyzing Business Central AL code and creating documentation for a security product called Sentinel. Your task is to review the provided AL code and generate a concise summary of the rule it implements.
+
+Here's the AL code you need to analyze:
+
+<code>
+${content}</code>
+
+Please follow these steps to create your summary:
+
+1. Carefully analyze the provided AL code.
+2. Identify the key components of the rule, including its ID, purpose, what it checks, why it matters, and any recommendations.
+3. Wrap your analysis inside <code_analysis> tags, following these steps:
+   a. Identify the rule ID
+   b. Determine the rule's purpose
+   c. List what the rule checks
+   d. Explain why the rule matters
+   e. Formulate a recommendation
+   f. Determine severity and area
+4. Based on your analysis, create a structured summary following the exact format provided below.
+
+Your final output must adhere to this structure:
+
+\`\`\`
+**Rule ID: [ID]**
+**Purpose**: [Brief description of what the rule does]
+
+**What it checks**:
+[List of items or configurations the rule examines]
+
+**Why it matters**: [Explanation of the rule's importance and potential consequences]
+
+**Recommendation**: [Suggested action or best practice]
+
+**Severity**: [Severity level]
+**Area**: [Relevant area in Business Central]
+\`\`\`
+
+Remember to fill in the placeholders with the appropriate information derived from your code analysis. Ensure that your summary is concise, accurate, and follows this structure exactly.
+
+Begin your response with your analysis, then provide the formatted summary.`;
+
 async function processSingleFile(filePath: string, outputDir: string, apiKey: string) {
   try {
     await Deno.mkdir(outputDir, { recursive: true });
@@ -29,7 +236,7 @@ async function processSingleFile(filePath: string, outputDir: string, apiKey: st
           content: [
             {
               type: "text",
-              text: `<examples>\n<example>\n<code>\nnamespace STM.BusinessCentral.Sentinel;\n\nusing Microsoft.Foundation.NoSeries;\nusing Microsoft.Purchases.Setup;\nusing Microsoft.Sales.Setup;\nusing STM.BusinessCentral.Sentinel;\n\ncodeunit 71180281 NonPostNoSeriesGapsSESTM implements IAuditAlertSESTM\n{\n    Access = Internal;\n    Permissions =\n        tabledata AlertSESTM = RI,\n        tabledata \"No. Series\" = R,\n        tabledata \"No. Series Line\" = R,\n        tabledata \"Purchases & Payables Setup\" = R,\n        tabledata \"Sales & Receivables Setup\" = R;\n\n    procedure CreateAlerts()\n    begin\n        CheckSalesSetup();\n        CheckPurchaseSetup();\n    end;\n\n    local procedure CheckPurchaseSetup()\n    var\n        PurchaseSetup: Record \"Purchases & Payables Setup\";\n    begin\n        PurchaseSetup.ReadIsolation(IsolationLevel::ReadUncommitted);\n        PurchaseSetup.SetLoadFields(\"Order Nos.\", \"Invoice Nos.\", \"Credit Memo Nos.\", \"Quote Nos.\", \"Vendor Nos.\", \"Blanket Order Nos.\", \"Price List Nos.\", \"Return Order Nos.\");\n        if not PurchaseSetup.Get() then\n            exit;\n\n        CheckNoSeries(PurchaseSetup.\"Order Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Invoice Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Credit Memo Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Quote Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Vendor Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Blanket Order Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Price List Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Return Order Nos.\");\n    end;\n\n    local procedure CheckSalesSetup()\n    var\n        SalesSetup: Record \"Sales & Receivables Setup\";\n    begin\n        SalesSetup.ReadIsolation(IsolationLevel::ReadUncommitted);\n        SalesSetup.SetLoadFields(\"Order Nos.\", \"Invoice Nos.\", \"Credit Memo Nos.\", \"Quote Nos.\", \"Customer Nos.\", \"Blanket Order Nos.\", \"Reminder Nos.\", \"Fin. Chrg. Memo Nos.\", \"Direct Debit Mandate Nos.\", \"Price List Nos.\");\n        if not SalesSetup.Get() then\n            exit;\n\n        CheckNoSeries(SalesSetup.\"Order Nos.\");\n        CheckNoSeries(SalesSetup.\"Invoice Nos.\");\n        CheckNoSeries(SalesSetup.\"Credit Memo Nos.\");\n        CheckNoSeries(SalesSetup.\"Quote Nos.\");\n        CheckNoSeries(SalesSetup.\"Customer Nos.\");\n        CheckNoSeries(SalesSetup.\"Blanket Order Nos.\");\n        CheckNoSeries(SalesSetup.\"Reminder Nos.\");\n        CheckNoSeries(SalesSetup.\"Fin. Chrg. Memo Nos.\");\n        CheckNoSeries(SalesSetup.\"Direct Debit Mandate Nos.\");\n        CheckNoSeries(SalesSetup.\"Price List Nos.\");\n    end;\n\n    local procedure CheckNoSeries(NoSeriesCode: Code[20])\n    var\n        Alert: Record AlertSESTM;\n        NoSeriesLine: Record \"No. Series Line\";\n        NoSeriesSingle: Interface \"No. Series - Single\";\n        ActionRecommendationLbl: Label 'Change No Series %1 to allow gaps', Comment = '%1 = No. Series Code';\n        LongDescLbl: Label 'The No. Series %1 does not allow gaps and is responsible for non-posting documents/records. Consider configuring the No. Series to allow gaps to increase performance and decrease locking.', Comment = '%1 = No. Series Code';\n        ShortDescLbl: Label 'No Series %1 does not allow gaps', Comment = '%1 = No. Series Code';\n    begin\n        NoSeriesLine.SetRange(\"Series Code\", NoSeriesCode);\n        if NoSeriesLine.FindSet() then\n            repeat\n                NoSeriesSingle := NoSeriesLine.Implementation;\n                if not NoSeriesSingle.MayProduceGaps() then\n                    Alert.New(\n                        AlertCodeSESTM::\"SE-000006\",\n                        StrSubstNo(ShortDescLbl, NoSeriesCode),\n                        SeveritySESTM::Warning,\n                        AreaSESTM::Performance,\n                        StrSubstNo(LongDescLbl, NoSeriesCode),\n                        StrSubstNo(ActionRecommendationLbl, NoSeriesCode),\n                        NoSeriesCode\n                    );\n            until NoSeriesLine.Next() = 0;\n    end;\n\n    procedure ShowMoreDetails(var Alert: Record AlertSESTM)\n    var\n        WikiLinkTok: Label 'https://github.com/StefanMaron/BusinessCentral.Sentinel/wiki/SE-000006', Locked = true;\n    begin\n        Hyperlink(WikiLinkTok);\n    end;\n\n    procedure ShowRelatedInformation(var Alert: Record AlertSESTM)\n    var\n        NoSeries: Record \"No. Series\";\n        OpenRecordQst: Label 'Do you want to open the No. Series %1?', Comment = '%1 = No. Series Code';\n    begin\n        if not Confirm(StrSubstNo(OpenRecordQst, Alert.UniqueIdentifier)) then\n            exit;\n\n        NoSeries.SetRange(\"Code\", Alert.UniqueIdentifier);\n        Page.Run(Page::\"No. Series\", NoSeries);\n    end;\n\n    procedure AutoFix(var Alert: Record AlertSESTM)\n    begin\n\n    end;\n}\n</code>\n<ideal_output>\n<code_analysis>\na. Rule ID: SE-000006\nb. Purpose: This rule checks for number series configurations in Business Central that don't allow gaps in both Sales and Purchase setups.\nc. What the rule checks:\n   - Purchase-related number series for: Orders, Invoices, Credit Memos, Quotes, Vendor Numbers, Blanket Orders, Price Lists, Return Orders\n   - Sales-related number series for: Orders, Invoices, Credit Memos, Quotes, Customer Numbers, Blanket Orders, Reminders, Finance Charge Memos, Direct Debit Mandates, Price Lists\nd. Why the rule matters: Number series that don't allow gaps can cause performance issues and locking problems in Business Central.\ne. Recommendation: Change the identified number series to allow gaps to improve performance and reduce locking issues.\nf. Severity: Warning\n   Area: Performance\n</code_analysis>\n\n**Rule ID: SE-000006**  \n**Purpose**: This rule checks for number series configurations in Business Central that don't allow gaps in both Sales and Purchase setups.\n \n**What it checks**:\n1. **Purchase-related number series** for:\n   - Orders\n   - Invoices\n   - Credit Memos\n   - Quotes\n   - Vendor Numbers\n   - Blanket Orders\n   - Price Lists\n   - Return Orders\n \n2. **Sales-related number series** for:\n   - Orders\n   - Invoices\n   - Credit Memos\n   - Quotes\n   - Customer Numbers\n   - Blanket Orders\n   - Reminders\n   - Finance Charge Memos\n   - Direct Debit Mandates\n   - Price Lists\n \n**Why it matters**: Number series that don't allow gaps can cause performance issues and locking problems in Business Central. The rule generates a warning alert when it finds such configurations.\n \n**Recommendation**: When identified, it suggests changing the number series to allow gaps to improve performance and reduce locking issues.\n \n**Severity**: Warning\n**Area**: Performance\n</ideal_output>\n</example>\n</examples>\n\nYou are an expert in analyzing Business Central AL code and creating documentation for a security product called Sentinel. Your task is to review the provided AL code and generate a concise summary of the rule it implements.\n\nHere's the AL code you need to analyze:\n\n<code>\n${content}</code>\n\nPlease follow these steps to create your summary:\n\n1. Carefully analyze the provided AL code.\n2. Identify the key components of the rule, including its ID, purpose, what it checks, why it matters, and any recommendations.\n3. Wrap your analysis inside <code_analysis> tags, following these steps:\n   a. Identify the rule ID\n   b. Determine the rule's purpose\n   c. List what the rule checks\n   d. Explain why the rule matters\n   e. Formulate a recommendation\n   f. Determine severity and area\n4. Based on your analysis, create a structured summary following the exact format provided below.\n\nYour final output must adhere to this structure:\n\n\`\`\`\n**Rule ID: [ID]**\n**Purpose**: [Brief description of what the rule does]\n\n**What it checks**:\n[List of items or configurations the rule examines]\n\n**Why it matters**: [Explanation of the rule's importance and potential consequences]\n\n**Recommendation**: [Suggested action or best practice]\n\n**Severity**: [Severity level]\n**Area**: [Relevant area in Business Central]\n\`\`\`\n\nRemember to fill in the placeholders with the appropriate information derived from your code analysis. Ensure that your summary is concise, accurate, and follows this structure exactly.\n\nBegin your response with your analysis, then provide the formatted summary.`
+              text: ANALYSIS_PROMPT
             }
           ]
         }
@@ -87,7 +294,7 @@ async function processALFiles(inputDir: string, outputDir: string, apiKey: strin
               content: [
                 {
                   type: "text",
-                  text: `<examples>\n<example>\n<code>\nnamespace STM.BusinessCentral.Sentinel;\n\nusing Microsoft.Foundation.NoSeries;\nusing Microsoft.Purchases.Setup;\nusing Microsoft.Sales.Setup;\nusing STM.BusinessCentral.Sentinel;\n\ncodeunit 71180281 NonPostNoSeriesGapsSESTM implements IAuditAlertSESTM\n{\n    Access = Internal;\n    Permissions =\n        tabledata AlertSESTM = RI,\n        tabledata \"No. Series\" = R,\n        tabledata \"No. Series Line\" = R,\n        tabledata \"Purchases & Payables Setup\" = R,\n        tabledata \"Sales & Receivables Setup\" = R;\n\n    procedure CreateAlerts()\n    begin\n        CheckSalesSetup();\n        CheckPurchaseSetup();\n    end;\n\n    local procedure CheckPurchaseSetup()\n    var\n        PurchaseSetup: Record \"Purchases & Payables Setup\";\n    begin\n        PurchaseSetup.ReadIsolation(IsolationLevel::ReadUncommitted);\n        PurchaseSetup.SetLoadFields(\"Order Nos.\", \"Invoice Nos.\", \"Credit Memo Nos.\", \"Quote Nos.\", \"Vendor Nos.\", \"Blanket Order Nos.\", \"Price List Nos.\", \"Return Order Nos.\");\n        if not PurchaseSetup.Get() then\n            exit;\n\n        CheckNoSeries(PurchaseSetup.\"Order Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Invoice Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Credit Memo Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Quote Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Vendor Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Blanket Order Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Price List Nos.\");\n        CheckNoSeries(PurchaseSetup.\"Return Order Nos.\");\n    end;\n\n    local procedure CheckSalesSetup()\n    var\n        SalesSetup: Record \"Sales & Receivables Setup\";\n    begin\n        SalesSetup.ReadIsolation(IsolationLevel::ReadUncommitted);\n        SalesSetup.SetLoadFields(\"Order Nos.\", \"Invoice Nos.\", \"Credit Memo Nos.\", \"Quote Nos.\", \"Customer Nos.\", \"Blanket Order Nos.\", \"Reminder Nos.\", \"Fin. Chrg. Memo Nos.\", \"Direct Debit Mandate Nos.\", \"Price List Nos.\");\n        if not SalesSetup.Get() then\n            exit;\n\n        CheckNoSeries(SalesSetup.\"Order Nos.\");\n        CheckNoSeries(SalesSetup.\"Invoice Nos.\");\n        CheckNoSeries(SalesSetup.\"Credit Memo Nos.\");\n        CheckNoSeries(SalesSetup.\"Quote Nos.\");\n        CheckNoSeries(SalesSetup.\"Customer Nos.\");\n        CheckNoSeries(SalesSetup.\"Blanket Order Nos.\");\n        CheckNoSeries(SalesSetup.\"Reminder Nos.\");\n        CheckNoSeries(SalesSetup.\"Fin. Chrg. Memo Nos.\");\n        CheckNoSeries(SalesSetup.\"Direct Debit Mandate Nos.\");\n        CheckNoSeries(SalesSetup.\"Price List Nos.\");\n    end;\n\n    local procedure CheckNoSeries(NoSeriesCode: Code[20])\n    var\n        Alert: Record AlertSESTM;\n        NoSeriesLine: Record \"No. Series Line\";\n        NoSeriesSingle: Interface \"No. Series - Single\";\n        ActionRecommendationLbl: Label 'Change No Series %1 to allow gaps', Comment = '%1 = No. Series Code';\n        LongDescLbl: Label 'The No. Series %1 does not allow gaps and is responsible for non-posting documents/records. Consider configuring the No. Series to allow gaps to increase performance and decrease locking.', Comment = '%1 = No. Series Code';\n        ShortDescLbl: Label 'No Series %1 does not allow gaps', Comment = '%1 = No. Series Code';\n    begin\n        NoSeriesLine.SetRange(\"Series Code\", NoSeriesCode);\n        if NoSeriesLine.FindSet() then\n            repeat\n                NoSeriesSingle := NoSeriesLine.Implementation;\n                if not NoSeriesSingle.MayProduceGaps() then\n                    Alert.New(\n                        AlertCodeSESTM::\"SE-000006\",\n                        StrSubstNo(ShortDescLbl, NoSeriesCode),\n                        SeveritySESTM::Warning,\n                        AreaSESTM::Performance,\n                        StrSubstNo(LongDescLbl, NoSeriesCode),\n                        StrSubstNo(ActionRecommendationLbl, NoSeriesCode),\n                        NoSeriesCode\n                    );\n            until NoSeriesLine.Next() = 0;\n    end;\n\n    procedure ShowMoreDetails(var Alert: Record AlertSESTM)\n    var\n        WikiLinkTok: Label 'https://github.com/StefanMaron/BusinessCentral.Sentinel/wiki/SE-000006', Locked = true;\n    begin\n        Hyperlink(WikiLinkTok);\n    end;\n\n    procedure ShowRelatedInformation(var Alert: Record AlertSESTM)\n    var\n        NoSeries: Record \"No. Series\";\n        OpenRecordQst: Label 'Do you want to open the No. Series %1?', Comment = '%1 = No. Series Code';\n    begin\n        if not Confirm(StrSubstNo(OpenRecordQst, Alert.UniqueIdentifier)) then\n            exit;\n\n        NoSeries.SetRange(\"Code\", Alert.UniqueIdentifier);\n        Page.Run(Page::\"No. Series\", NoSeries);\n    end;\n\n    procedure AutoFix(var Alert: Record AlertSESTM)\n    begin\n\n    end;\n}\n</code>\n<ideal_output>\n<code_analysis>\na. Rule ID: SE-000006\nb. Purpose: This rule checks for number series configurations in Business Central that don't allow gaps in both Sales and Purchase setups.\nc. What the rule checks:\n   - Purchase-related number series for: Orders, Invoices, Credit Memos, Quotes, Vendor Numbers, Blanket Orders, Price Lists, Return Orders\n   - Sales-related number series for: Orders, Invoices, Credit Memos, Quotes, Customer Numbers, Blanket Orders, Reminders, Finance Charge Memos, Direct Debit Mandates, Price Lists\nd. Why the rule matters: Number series that don't allow gaps can cause performance issues and locking problems in Business Central.\ne. Recommendation: Change the identified number series to allow gaps to improve performance and reduce locking issues.\nf. Severity: Warning\n   Area: Performance\n</code_analysis>\n\n**Rule ID: SE-000006**  \n**Purpose**: This rule checks for number series configurations in Business Central that don't allow gaps in both Sales and Purchase setups.\n \n**What it checks**:\n1. **Purchase-related number series** for:\n   - Orders\n   - Invoices\n   - Credit Memos\n   - Quotes\n   - Vendor Numbers\n   - Blanket Orders\n   - Price Lists\n   - Return Orders\n \n2. **Sales-related number series** for:\n   - Orders\n   - Invoices\n   - Credit Memos\n   - Quotes\n   - Customer Numbers\n   - Blanket Orders\n   - Reminders\n   - Finance Charge Memos\n   - Direct Debit Mandates\n   - Price Lists\n \n**Why it matters**: Number series that don't allow gaps can cause performance issues and locking problems in Business Central. The rule generates a warning alert when it finds such configurations.\n \n**Recommendation**: When identified, it suggests changing the number series to allow gaps to improve performance and reduce locking issues.\n \n**Severity**: Warning\n**Area**: Performance\n</ideal_output>\n</example>\n</examples>\n\nYou are an expert in analyzing Business Central AL code and creating documentation for a security product called Sentinel. Your task is to review the provided AL code and generate a concise summary of the rule it implements.\n\nHere's the AL code you need to analyze:\n\n<code>\n${content}</code>\n\nPlease follow these steps to create your summary:\n\n1. Carefully analyze the provided AL code.\n2. Identify the key components of the rule, including its ID, purpose, what it checks, why it matters, and any recommendations.\n3. Wrap your analysis inside <code_analysis> tags, following these steps:\n   a. Identify the rule ID\n   b. Determine the rule's purpose\n   c. List what the rule checks\n   d. Explain why the rule matters\n   e. Formulate a recommendation\n   f. Determine severity and area\n4. Based on your analysis, create a structured summary following the exact format provided below.\n\nYour final output must adhere to this structure:\n\n\`\`\`\n**Rule ID: [ID]**\n**Purpose**: [Brief description of what the rule does]\n\n**What it checks**:\n[List of items or configurations the rule examines]\n\n**Why it matters**: [Explanation of the rule's importance and potential consequences]\n\n**Recommendation**: [Suggested action or best practice]\n\n**Severity**: [Severity level]\n**Area**: [Relevant area in Business Central]\n\`\`\`\n\nRemember to fill in the placeholders with the appropriate information derived from your code analysis. Ensure that your summary is concise, accurate, and follows this structure exactly.\n\nBegin your response with your analysis, then provide the formatted summary.`
+                  text: ANALYSIS_PROMPT
                 }
               ]
             },
