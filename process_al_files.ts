@@ -252,6 +252,15 @@ async function processSingleFile(filePath: string, outputDir: string, apiKey: st
 
   const result = await response.json();
   
+  const usage = result.usage;
+  const cost = calculateCost(usage.input_tokens, usage.output_tokens);
+  totalInputTokens += usage.input_tokens;
+  totalOutputTokens += usage.output_tokens;
+  totalCost += cost;
+  
+  console.log(`API Usage - Input tokens: ${usage.input_tokens}, Output tokens: ${usage.output_tokens}`);
+  console.log(`Cost for this file: $${cost.toFixed(4)}`);
+  
   const fileName = filePath.split(/[\\/]/).pop() ?? '';
   const outputFilename = fileName.replace('.al', '.md');
   const outputPath = join(outputDir, outputFilename);
@@ -319,6 +328,15 @@ async function processALFiles(inputDir: string, outputDir: string, apiKey: strin
 
       const result = await response.json();
       
+      const usage = result.usage;
+      const cost = calculateCost(usage.input_tokens, usage.output_tokens);
+      totalInputTokens += usage.input_tokens;
+      totalOutputTokens += usage.output_tokens;
+      totalCost += cost;
+      
+      console.log(`API Usage - Input tokens: ${usage.input_tokens}, Output tokens: ${usage.output_tokens}`);
+      console.log(`Cost for this file: $${cost.toFixed(4)}`);
+      
       const outputFilename = entry.name.replace('.al', '.md');
       const outputPath = join(outputDir, outputFilename);
       
@@ -331,6 +349,20 @@ async function processALFiles(inputDir: string, outputDir: string, apiKey: strin
     }
   }
 }
+
+function calculateCost(inputTokens: number, outputTokens: number): number {
+    const INPUT_COST_PER_MILLION = 3;    // USD per million tokens
+    const OUTPUT_COST_PER_MILLION = 15;  // USD per million tokens
+    
+    const inputCost = (inputTokens / 1_000_000) * INPUT_COST_PER_MILLION;
+    const outputCost = (outputTokens / 1_000_000) * OUTPUT_COST_PER_MILLION;
+    
+    return inputCost + outputCost;
+}
+
+let totalInputTokens = 0;
+let totalOutputTokens = 0;
+let totalCost = 0;
 
 // Get command line arguments
 const args = Deno.args;
@@ -369,3 +401,8 @@ if ((await Deno.stat(inputPath)).isDirectory) {
 } else {
   await processSingleFile(inputPath, outputDir, apiKey);
 }
+
+console.log("\nTotal Usage Summary:");
+console.log(`Total Input Tokens: ${totalInputTokens}`);
+console.log(`Total Output Tokens: ${totalOutputTokens}`);
+console.log(`Total Cost: $${totalCost.toFixed(4)}`);
